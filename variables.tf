@@ -42,5 +42,5 @@ variable "webhook" {
 
 variable "ecr_registry" {
   description = "Ecr registry url for flask micro service"
-  default     = "626668625088.dkr.ecr.ap-south-1.amazonaws.com"
+  default     = "626668625088.dkr.ecr.ap-south-1.amazonaws.com/test"
 }
