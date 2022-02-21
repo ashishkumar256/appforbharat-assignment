@@ -1,21 +1,8 @@
-provider "aws" {
-  region  = "ap-south-1"
-}
-
-data "terraform_remote_state" "vpc" {
-  backend = "s3"
-  config = {
-    bucket = "insider-terraform-poc"
-    key    = "prd-vpc"
-    region = "ap-south-1"
-  }
-}
-
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  subnet_ids_arn = split(",", "${data.terraform_remote_state.vpc.outputs.private_subnets_arn}")
+  subnet_ids_arn = var.private_subnets_arn
   aws_account_id = data.aws_caller_identity.current.account_id
   aws_region = data.aws_region.current.name
 }
@@ -25,7 +12,7 @@ output "x" {
 }
 
 resource "aws_iam_role" "demo" {
-  name = "demo"
+  name = "${var.name}-codebuild-role"
 
   assume_role_policy = <<EOF
 {
@@ -145,7 +132,7 @@ POLICY
 }
 
 resource "aws_s3_bucket" "demo" {
-  bucket = "codebuild-${local.aws_account_id}-logs"
+  bucket = "${var.name}-${var.environment}-codebuild-logs"
 }
 
 resource "aws_s3_bucket_acl" "demo" {
@@ -154,9 +141,9 @@ resource "aws_s3_bucket_acl" "demo" {
 }
 
 resource "aws_security_group" "codebuild_sg" {
-  name        = "codebuild-sg"
+  name        = "${var.name}-codebuild-sg"
   description = "Allow TLS inbound traffic"
-  vpc_id     = "${data.terraform_remote_state.vpc.outputs.id}"
+  vpc_id     = var.vpc_id
 
   egress {
     from_port        = 0
@@ -175,8 +162,8 @@ resource "aws_security_group" "codebuild_sg" {
 
 
 resource "aws_codebuild_project" "demo" {
-  name          = "test-project"
-  description   = "test_codebuild_project"
+  name          = "${var.name}-project"
+  description   = "Demo codebuild project"
   build_timeout = "5"
   service_role  = aws_iam_role.demo.arn
 
@@ -206,9 +193,9 @@ resource "aws_codebuild_project" "demo" {
   }
 
   source {
-    type            = "GITHUB"
-    location        = "https://github.com/ashishkumar256/appforbharat-assignment.git"
-    buildspec       = "buildspec.yml"
+    type            = var.code_source
+    location        = var.github_repo 
+    buildspec       = var.buildspec_path
     git_clone_depth = 1
 
     git_submodules_config {
@@ -216,13 +203,13 @@ resource "aws_codebuild_project" "demo" {
     }
   }
 
-  source_version = "master"
+  source_version = var.github_branch
 
   
   vpc_config {
-    vpc_id = "${data.terraform_remote_state.vpc.outputs.id}"
+    vpc_id = var.vpc_id
 
-    subnets = split(",", "${data.terraform_remote_state.vpc.outputs.private_subnets}")
+    subnets = split(",", "${var.private_subnets}")
     
     security_group_ids = [
       aws_security_group.codebuild_sg.id,
@@ -231,7 +218,7 @@ resource "aws_codebuild_project" "demo" {
   } 
 
   tags = {
-    Environment = "Test"
+    Environment = var.name
   }
 }
 
@@ -253,5 +240,14 @@ resource "aws_codebuild_webhook" "demo" {
   }
 }
 
+
+resource "aws_ecr_repository" "demo" {
+  name                 = var.ecr_registry
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = false
+  }
+}
 
 
