@@ -2,13 +2,8 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  subnet_ids_arn = var.private_subnets_arn
   aws_account_id = data.aws_caller_identity.current.account_id
   aws_region = data.aws_region.current.name
-}
-
-output "x" {
-  value = local.subnet_ids_arn
 }
 
 resource "aws_iam_role" "demo" {
@@ -81,11 +76,7 @@ resource "aws_iam_role_policy" "demo" {
       ],
       "Condition": {
         "StringEquals": {
-          "ec2:Subnet": [
-            "arn:aws:ec2:ap-south-1:626668625088:subnet/subnet-091a43da27f199e7b",
-            "arn:aws:ec2:ap-south-1:626668625088:subnet/subnet-0cb7ffe598b1fbcf9",
-            "arn:aws:ec2:ap-south-1:626668625088:subnet/subnet-07f6c8906a013facb"
-          ],
+          "ec2:Subnet": ["${var.private_subnets_arn}"],
           "ec2:AuthorizedService": "codebuild.amazonaws.com"
         }
       }
@@ -157,9 +148,6 @@ resource "aws_security_group" "codebuild_sg" {
     Name = "codebuild-sg"
   }
 }
-
-
-
 
 resource "aws_codebuild_project" "demo" {
   name          = "${var.name}-project"

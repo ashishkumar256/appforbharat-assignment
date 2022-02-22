@@ -1,5 +1,7 @@
-/*output "id" {
-  value = module.codebuild.id
+/*
+output "name" {
+  value = module.codebuild.name
 }
 */
+
 
